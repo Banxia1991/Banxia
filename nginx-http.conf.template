@@ -1,0 +1,27 @@
+server {
+    listen 80;
+    server_name __DOMAIN__;
+
+    # ACME HTTP-01 challenge (cert issuance + renewal)
+    location ^~ /.well-known/acme-challenge/ { root /var/www/html; }
+
+    # MCP OAuth discovery off -> 404 so Claude.ai skips DCR/OAuth entirely
+    location ^~ /.well-known/ { return 404; }
+
+    location /mcp {
+        proxy_pass http://127.0.0.1:__PORT__;
+        proxy_http_version 1.1;
+        # The streamable-http transport validates the Host header
+        # (DNS-rebinding guard) -> present the host it expects.
+        proxy_set_header Host "127.0.0.1:__PORT__";
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+        proxy_read_timeout 3600s;
+        proxy_buffering off;
+        # rewrite any internal redirect so 127.0.0.1 never leaks to the client
+        proxy_redirect http://127.0.0.1:__PORT__/ /;
+    }
+
+    location / { return 404; }
+}
